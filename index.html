@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>QuietFrame v8 — hosted TV control test</title>
+<style>
+  :root{color-scheme:dark;--cream:#f7f5f0;--muted:rgba(250,250,250,.67);--line:rgba(255,255,255,.20)}
+  *{box-sizing:border-box}
+  html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#101821;color:var(--cream);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif}
+  body{position:relative;isolation:isolate}
+  .scene{position:absolute;inset:-2%;z-index:-5;overflow:hidden;background:linear-gradient(126deg,#0d1524 4%,#233b4d 39%,#c08063 82%,#e8ae82 100%);transition:background 400ms}
+  .scene:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(3,12,18,.5),transparent 85%),linear-gradient(0deg,rgba(0,0,0,.53),transparent 28%)}
+  .sun{position:absolute;width:25vw;height:25vw;border-radius:50%;right:17%;top:18%;background:#f8ca9d;filter:blur(18px);opacity:.72;box-shadow:0 0 95px 40px rgba(244,174,136,.2)}
+  .mountain{position:absolute;width:130%;height:72%;left:-7%;bottom:-28%;background:linear-gradient(165deg,#1b414a,#0e1c27 80%);transform:rotate(-10deg);border-radius:50% 40% 0 0;filter:blur(8px)}
+  .mountain.two{left:35%;bottom:-36%;height:65%;background:linear-gradient(145deg,#273f4b,#121722);transform:rotate(15deg);filter:blur(2px)}
+  .mist{position:absolute;left:0;right:0;bottom:10%;height:19%;background:linear-gradient(transparent,rgba(157,174,165,.23),transparent);filter:blur(30px)}
+  body[data-theme="night"] .scene{background:linear-gradient(125deg,#050b18,#1b2d4f 52%,#685b88 99%)}
+  body[data-theme="night"] .sun{background:#d8dcff;box-shadow:0 0 70px 20px rgba(159,170,242,.15);width:12vw;height:12vw;right:20%;top:16%}
+  body[data-theme="forest"] .scene{background:linear-gradient(130deg,#0b1c21,#215b5c 42%,#9cbea2 100%)}
+  body[data-theme="forest"] .sun{background:#d9ecd8;box-shadow:0 0 70px 35px rgba(211,255,228,.13)}
+  .ui{position:relative;height:100%;display:flex;flex-direction:column;padding:5.1vh 5.5vw 5.3vh;z-index:1}
+  header{display:flex;justify-content:space-between;align-items:center;gap:1rem}
+  .brand{display:flex;align-items:center;gap:14px;font-weight:650;font-size:clamp(16px,1.35vw,28px);letter-spacing:.045em}
+  .brand-mark{height:27px;width:27px;border:2px solid rgba(255,255,255,.95);border-radius:8px;transform:rotate(-13deg);display:inline-block;position:relative}
+  .brand-mark:after{content:"";position:absolute;inset:5px;border:1px solid rgba(255,255,255,.75);border-radius:2px}
+  .chip{border:1px solid var(--line);background:rgba(2,15,24,.18);padding:10px 16px;border-radius:30px;font-size:clamp(11px,.95vw,18px);font-weight:500;letter-spacing:.08em;text-transform:uppercase}
+  main{margin-top:auto;margin-bottom:auto;padding-bottom:4vh}
+  .eyebrow{font-size:clamp(12px,1.0vw,18px);text-transform:uppercase;letter-spacing:.23em;color:var(--muted);font-weight:650;margin-bottom:2vh}
+  .clock{font-size:clamp(96px,11.9vw,256px);letter-spacing:-.075em;line-height:.9;font-weight:300;font-variant-numeric:tabular-nums;text-shadow:0 10px 42px rgba(0,0,0,.12)}
+  .ampm{font-size:clamp(17px,2.2vw,40px);margin-left:.8vw;letter-spacing:.01em;font-weight:400;vertical-align:middle}
+  .date{font-size:clamp(22px,2vw,43px);margin-top:3vh;font-weight:400;letter-spacing:-.025em;color:rgba(255,255,255,.87)}
+  footer{display:block}
+  .dock-wrap{max-width:100%}
+  .small-title{font-size:clamp(10px,.88vw,16px);text-transform:uppercase;letter-spacing:.22em;color:var(--muted);margin-bottom:1.3vh;font-weight:600}
+  .dock{display:flex;gap:clamp(6px,.75vw,15px);width:100%}
+  button.tile{appearance:none;color:#fff;border:1px solid rgba(255,255,255,.22);background:rgba(7,13,21,.42);flex:1;min-width:0;height:clamp(92px,9vw,170px);border-radius:clamp(16px,1.45vw,28px);display:flex;align-items:flex-start;justify-content:space-between;flex-direction:column;padding:clamp(12px,1.05vw,22px);font-size:clamp(13px,1vw,21px);font-weight:560;cursor:pointer;text-align:left;outline:none;box-shadow:0 12px 42px rgba(0,0,0,.10);transition:transform .15s,background .15s,border-color .15s}
+  button.tile:focus,button.tile.active{border:3px solid white;background:rgba(255,255,255,.23);transform:translateY(-9px);box-shadow:0 0 0 4px rgba(255,255,255,.16),0 18px 42px rgba(0,0,0,.22)}
+  .tile-symbol{display:flex;justify-content:center;align-items:center;height:clamp(30px,2.85vw,58px);width:clamp(30px,2.85vw,58px);border-radius:14px;background:rgba(255,255,255,.14);font-size:clamp(20px,1.95vw,40px);font-weight:700;letter-spacing:-.08em}
+  .tile.ps4 .tile-symbol{background:#11479b;color:#fff;font-size:clamp(16px,1.65vw,34px);letter-spacing:-.08em}
+  .tile.hdmi .tile-symbol{background:rgba(255,255,255,.15);font-size:clamp(11px,1.05vw,20px);letter-spacing:0}
+  .tile.youtube .tile-symbol{background:#eb332a;font-size:clamp(18px,1.7vw,36px);letter-spacing:0}
+  .tile.netflix .tile-symbol{color:#e62431;background:rgba(0,0,0,.4)}
+  .tile.prime .tile-symbol{background:#1164ba}
+  .tile.settings .tile-symbol{font-size:clamp(21px,2vw,42px)}
+  .hint{margin-top:1.2vh;text-align:left;color:rgba(255,255,255,.7);font-size:clamp(12px,.88vw,17px);line-height:1.4}
+  .overlay{display:none;position:absolute;inset:0;align-items:center;justify-content:center;z-index:10;background:rgba(2,7,13,.60);backdrop-filter:blur(15px)}
+  .overlay.show{display:flex}
+  .dialog{width:min(700px,72vw);border:1px solid rgba(255,255,255,.2);background:#17202bdc;box-shadow:0 30px 80px rgba(0,0,0,.25);border-radius:26px;padding:40px 44px}
+  .dialog h2{font-size:clamp(25px,2.1vw,39px);font-weight:500;margin:0 0 14px}
+  .dialog p{font-size:clamp(15px,1.1vw,21px);color:#cbd0d6;line-height:1.65;margin:0 0 23px}
+  .dialog .tip{color:#aeb5bd;font-size:15px;margin-top:24px}
+  .swatches{display:flex;gap:15px}
+  .swatch{height:55px;width:90px;border-radius:12px;border:3px solid transparent;background:#c08063;cursor:pointer}
+  .swatch:nth-child(2){background:#283658}.swatch:nth-child(3){background:#347b67}
+  .swatch:focus,.swatch.selected{outline:none;border-color:white;box-shadow:0 0 0 3px rgba(255,255,255,.18)}
+  .status{position:absolute;right:5.5vw;top:13vh;color:#fff;font-size:14px;letter-spacing:.02em;opacity:.85}
+  @media(max-width:900px){.ui{padding:24px}.clock{font-size:18vw}.dock{flex-wrap:wrap}.dock .tile{flex:1 1 21%;min-width:110px}.hint{display:none}.date{font-size:23px}main{padding-bottom:3vh}}
+</style>
+</head>
+<body data-theme="sunset">
+<div class="scene" aria-hidden="true"><div class="sun"></div><div class="mountain"></div><div class="mountain two"></div><div class="mist"></div></div>
+<div class="ui">
+  <header><div class="brand"><span class="brand-mark"></span> QuietFrame</div><div class="chip" id="tvDirectStatus" aria-live="polite">TV controls · Checking…</div></header>
+  <main><div class="eyebrow">Your TV. Your space.</div><div class="clock"><span id="time">10:08</span><span class="ampm" id="ampm">PM</span></div><div class="date" id="date">Wednesday, November 4</div></main>
+  <footer><div class="dock-wrap"><div class="small-title">Your space</div><nav class="dock" aria-label="App dock">
+    <button class="tile ps4" data-name="PS4 (HDMI 3)" data-action="ps4"><span class="tile-symbol">PS</span><span>PS4 <small style="font-size:.65em;opacity:.8;white-space:nowrap">HDMI 3</small></span></button>
+    <button class="tile hdmi" data-name="HDMI 1" data-action="hdmi1"><span class="tile-symbol">HDMI</span><span>HDMI 1</span></button>
+    <button class="tile hdmi" data-name="HDMI 2" data-action="hdmi2"><span class="tile-symbol">HDMI</span><span>HDMI 2</span></button>
+    <button class="tile youtube" data-name="YouTube" data-action="youtube"><span class="tile-symbol">▶</span><span>YouTube</span></button>
+    <button class="tile netflix" data-name="Netflix" data-action="netflix"><span class="tile-symbol">N</span><span>Netflix</span></button>
+    <button class="tile prime" data-name="Prime Video" data-action="prime"><span class="tile-symbol">p</span><span>Prime Video</span></button>
+    <button class="tile settings" data-name="Appearance"><span class="tile-symbol">⚙</span><span>Appearance</span></button>
+  </nav></div><div class="hint">Use ◀ ▶ on your TV remote<br>Press OK to launch · Back to close · Info / I for diagnostics</div></footer>
+</div>
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><section class="dialog"><h2 id="modalTitle">Prototype</h2><p id="modalDescription">We're testing the interface.</p><div id="swatches" class="swatches" style="display:none"><button class="swatch" data-theme="sunset" title="Sunset"></button><button class="swatch" data-theme="night" title="Night"></button><button class="swatch" data-theme="forest" title="Forest"></button></div><div class="tip">Press Back / Escape to close</div></section></div>
+<script>
+(function(){
+  var tiles=Array.prototype.slice.call(document.querySelectorAll('.tile'));
+  var swatches=Array.prototype.slice.call(document.querySelectorAll('.swatch'));
+  var overlay=document.getElementById('overlay');
+  var title=document.getElementById('modalTitle');
+  var description=document.getElementById('modalDescription');
+  var choose=document.getElementById('swatches');
+  var focusIndex=0;
+  var wasFocused=null;
+  var dialogId=0;
+  var controlBusy=false;
+  var actionAttempted=false;
+  function updateTime(){
+    var now=new Date(),h=now.getHours(),m=now.getMinutes();
+    document.getElementById('time').textContent=String(h%12||12)+':'+('0'+m).slice(-2);
+    document.getElementById('ampm').textContent=h>=12?'PM':'AM';
+    try{document.getElementById('date').textContent=now.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'});}catch(e){document.getElementById('date').textContent=now.toDateString();}
+  }
+  updateTime();setInterval(updateTime,15000);
+  try{var pref=localStorage.getItem('quietframe.theme');if(['sunset','night','forest'].indexOf(pref)>-1)document.body.dataset.theme=pref;}catch(e){}
+
+  // Path A experiment: TV-local SCPL endpoints, based on reported firmware behavior.
+  // Host only on your own trusted static site. Do not include your external pairing token.
+  var TV_LOCAL='http://127.0.0.1:7346';
+  var BUILD='v8.1-hosted-test';
+  var REQUEST_TIMEOUT=10000;
+  var statusElement=document.getElementById('tvDirectStatus');
+  var probeResult='Not completed';
+  var lastRequest='None';
+  // Only locally generated summaries are retained. Never retain response bodies,
+  // headers, tokens, or raw errors (the service could echo authentication data).
+  function tvError(stage,reason,uncertain){
+    var error=new Error(stage+': '+reason+(uncertain?' Command outcome is unknown; check the TV before trying again.':''));
+    error.uncertain=!!uncertain;
+    return error;
+  }
+  function diagnostics(){
+    return BUILD+' | Page: '+location.protocol+' | Secure context: '+String(window.isSecureContext)+
+      ' | Browser: '+navigator.userAgent+' | Power probe: '+probeResult+' | Last request: '+lastRequest;
+  }
+  var appConfig={
+    youtube:{NAME_SPACE:5,APP_ID:'1',MESSAGE:''},
+    netflix:{NAME_SPACE:3,APP_ID:'1',MESSAGE:''},
+    prime:{NAME_SPACE:3,APP_ID:'3',MESSAGE:''}
+  };
+  var inputConfig={ps4:'hdmi3',hdmi1:'hdmi1',hdmi2:'hdmi2'};
+  function requestTV(path,options){
+    var opts=options||{};
+    var stage=(opts.method||'GET')+' '+path;
+    var isWrite=opts.method==='PUT';
+    // Never follow a redirect that could forward AUTH outside TV loopback.
+    opts.mode='cors';opts.credentials='omit';opts.cache='no-store';opts.redirect='error';
+    return new Promise(function(resolve,reject){
+      var settled=false;
+      var controller=typeof AbortController==='function'?new AbortController():null;
+      if(controller)opts.signal=controller.signal;
+      function finish(error,data){
+        if(settled)return;
+        settled=true;clearTimeout(timer);
+        lastRequest=error?error.message:stage+': SUCCESS';
+        if(error)reject(error);else resolve(data);
+      }
+      var timer=setTimeout(function(){
+        finish(tvError(stage,'Timed out after 10 seconds.',isWrite));
+        if(controller)controller.abort();
+      },REQUEST_TIMEOUT);
+      // Promise wrapping also handles browsers with no fetch or a synchronous failure.
+      Promise.resolve().then(function(){
+        if(typeof fetch!=='function')throw tvError(stage,'This browser has no Fetch API.');
+        return fetch(TV_LOCAL+path,opts);
+      }).then(function(resp){
+        return resp.text().then(function(text){
+          var data;
+          if(!resp.ok)throw tvError(stage,'HTTP '+resp.status+'.',isWrite);
+          try{data=JSON.parse(text);}catch(e){throw tvError(stage,'Non-JSON response (HTTP '+resp.status+').',isWrite);}
+          if(!data||!data.STATUS||data.STATUS.RESULT!=='SUCCESS'){
+            var result=data&&data.STATUS&&data.STATUS.RESULT;
+            var known=['FAILURE','HASHVAL_ERROR','AUTH_ERROR','INVALID_PARAMETER'].indexOf(result)!==-1;
+            throw tvError(stage,known?'API returned '+result+'.':'API did not report SUCCESS.',isWrite);
+          }
+          finish(null,data);
+        });
+      }).catch(function(error){
+        // Browser policy failures and connection failures commonly share TypeError.
+        finish(error&&error.uncertain!==undefined?error:tvError(stage,
+          'No readable response. Browser policy (CORS, mixed content or local-network access), a redirect, or the local service may be responsible.',isWrite));
+      });
+    });
+  }
+  function acquireTVToken(){
+    // The token lives solely in this page memory for a single action.
+    return requestTV('/app/get_auth_token').then(function(data){
+      var v=data.ITEM&&(data.ITEM.VALUE||data.ITEM.AUTH_TOKEN);
+      if(!v||typeof v!=='string')throw tvError('GET /app/get_auth_token','Token response shape was not recognized.');
+      return v;
+    });
+  }
+  function sendCommand(path,token,body){
+    return requestTV(path,{
+      method:'PUT',
+      headers:{'AUTH':token,'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+  }
+  function directControl(action){
+    if(!Object.prototype.hasOwnProperty.call(appConfig,action) &&
+       !Object.prototype.hasOwnProperty.call(inputConfig,action)){
+      return Promise.reject(new Error('Unknown action'));
+    }
+    return acquireTVToken().then(function(token){
+      if(appConfig[action]){
+        return sendCommand('/app/launch',token,{VALUE:appConfig[action]});
+      }
+      var endpoint='/menu_native/dynamic/tv_settings/devices/current_input';
+      return requestTV(endpoint,{headers:{'AUTH':token}}).then(function(state){
+        var items=Array.isArray(state.ITEMS)?state.ITEMS:[];
+        var item=items.filter(function(x){return x.CNAME==='current_input';})[0]||items[0];
+        if(!item||typeof item.HASHVAL!=='number'||!isFinite(item.HASHVAL))throw tvError('GET '+endpoint,'No numeric input HASHVAL was returned.');
+        var target=inputConfig[action];
+        if(String(item.VALUE||'').toLowerCase().replace(/[- ]/g,'')===target)return state;
+        return sendCommand(endpoint,token,{REQUEST:'MODIFY',VALUE:target,HASHVAL:item.HASHVAL});
+      });
+    });
+  }
+  // Safe read-only probe. Displays result on TV, never sends an API token to a host.
+  requestTV('/state/device/power_mode').then(function(data){
+    probeResult='SUCCESS (power read only)';
+    if(!actionAttempted)statusElement.textContent='TV controls · Power read OK';
+  }).catch(function(err){
+    probeResult=err.message;
+    if(!actionAttempted)statusElement.textContent='TV controls · Probe failed · Info / I';
+  });
+
+  function showDiagnostics(){
+    dialogId++;
+    wasFocused=document.activeElement;
+    title.textContent='TV control diagnostics';
+    description.textContent=diagnostics();
+    choose.style.display='none';
+    overlay.classList.add('show');
+  }
+  statusElement.addEventListener('click',showDiagnostics);
+  function show(tile){
+    if(tile.dataset.action&&controlBusy)return;
+    var currentDialog=++dialogId;
+    wasFocused=tile;
+    var action=tile.dataset.action;
+    if(action){
+      actionAttempted=true;
+      var appName=tile.dataset.name;
+      var isInput=['ps4','hdmi1','hdmi2'].indexOf(action)!==-1;
+      title.textContent=isInput?'Switching to '+appName:'Launching '+appName;
+      description.textContent=isInput?'Switching input directly from this TV…':'Sending command directly from this TV…';
+      choose.style.display='none';
+      overlay.classList.add('show');
+      controlBusy=true;
+      // No requests go to a Mac controller. Commands originate inside the TV.
+      directControl(action).then(function(){
+        controlBusy=false;
+        statusElement.textContent='TV controls · Command accepted';
+        if(currentDialog!==dialogId)return;
+        description.textContent=isInput?'Input-switch command accepted. Your TV should now show '+appName+'.':'Launch accepted. Your TV should now open '+appName+'.';
+      }).catch(function(err){
+        controlBusy=false;
+        lastRequest=err.message;
+        statusElement.textContent='TV controls · Action failed · Info / I';
+        if(currentDialog!==dialogId)return;
+        title.textContent=err.uncertain?'Command result unavailable':(isInput?'Could not switch to '+appName:'Could not launch '+appName);
+        description.textContent=err.message+' Press Info / I for diagnostics.';
+      });
+      return;
+    }
+    if(tile.dataset.name==='Appearance'){
+      title.textContent='Appearance';description.textContent='Choose a background color. Your preference is saved in this TV browser when permitted.';
+      choose.style.display='flex';
+    }else{
+      title.textContent=tile.dataset.name;
+      description.textContent='The native app shortcut for '+tile.dataset.name+' is not connected yet. We can add it after verifying the app ID on your TV.';
+      choose.style.display='none';
+    }
+    overlay.classList.add('show');
+    if(tile.dataset.name==='Appearance'){
+      var theme=document.body.dataset.theme;
+      swatches.forEach(function(s){s.classList.toggle('selected',s.dataset.theme===theme);});
+      (swatches.filter(function(s){return s.dataset.theme===theme;})[0]||swatches[0]).focus();
+    }
+  }
+  function close(){dialogId++;overlay.classList.remove('show');if(wasFocused&&wasFocused.focus)wasFocused.focus();}
+  tiles.forEach(function(t,i){t.addEventListener('focus',function(){focusIndex=i;});t.addEventListener('click',function(){show(t);});});
+  swatches.forEach(function(s){s.addEventListener('click',function(){var theme=s.dataset.theme;document.body.dataset.theme=theme;try{localStorage.setItem('quietframe.theme',theme);}catch(e){}swatches.forEach(function(b){b.classList.toggle('selected',b===s);});});});
+  document.addEventListener('keydown',function(e){
+    var key=e.key||'',code=e.keyCode;
+    // Info key delivery depends on the webview. I and clicking the status are fallbacks.
+    if(key==='Info'||key==='i'||key==='I'||code===457){e.preventDefault();showDiagnostics();return;}
+    if(key==='Escape'||key==='Backspace'||code===27||code===8){if(overlay.classList.contains('show')){e.preventDefault();close();}return;}
+    if(overlay.classList.contains('show')){
+      if(choose.style.display==='flex'&&(key==='ArrowLeft'||key==='ArrowRight'||code===37||code===39)){
+        e.preventDefault();var ix=swatches.indexOf(document.activeElement);ix=(ix+(key==='ArrowRight'||code===39?1:-1)+swatches.length)%swatches.length;swatches[ix].focus();
+      }
+      if((key==='Enter'||code===13)&&choose.style.display==='flex'){e.preventDefault();(document.activeElement&&document.activeElement.classList.contains('swatch')?document.activeElement:swatches[0]).click();}
+      return;
+    }
+    if(key==='ArrowLeft'||key==='ArrowRight'||key==='ArrowUp'||key==='ArrowDown'||[37,38,39,40].indexOf(code)!==-1){
+      e.preventDefault();var d=(key==='ArrowRight'||key==='ArrowDown'||code===39||code===40)?1:-1;
+      focusIndex=(focusIndex+d+tiles.length)%tiles.length;tiles[focusIndex].focus();return;
+    }
+    if(key==='Enter'||code===13){e.preventDefault();show(tiles[focusIndex]);}
+  });
+  // Select the first tile to make D-pad navigation discoverable.
+  setTimeout(function(){tiles[0].focus();},400);
+})();
+</script>
+</body>
+</html>
