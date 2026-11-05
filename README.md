@@ -26,7 +26,7 @@ Changes cover request timeouts, safe diagnostics, redirect rejection, duplicate-
 
 No build process or Python server is required. See [GitHub's Pages guide](https://docs.github.com/en/pages/getting-started-with-github-pages/creating-a-github-pages-site) and [branch-source instructions](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
 
-The source repository is [KrishDesai/no-vizio-please](https://github.com/KrishDesai/no-vizio-please). Its intended Pages URL is `https://krishdesai.github.io/no-vizio-please/`; confirm the Pages deployment succeeds before using it on the TV. The repository's existing private visibility is preserved. Publishing Pages from a private repository depends on the account's plan; the TV needs a publicly accessible page without a GitHub sign-in prompt. GitHub CLI authentication works when network access is permitted. Source publication is performed from a temporary checkout; this local workspace does not need a running Git or Python service.
+The source repository is [KrishDesai/no-vizio-please](https://github.com/KrishDesai/no-vizio-please). With the owner's approval, it was made public because the current GitHub plan does not support Pages from a private repository. Pages is configured for `main` at `/(root)`, with HTTPS enforced, at [QuietFrame](https://krishdesai.github.io/no-vizio-please/). Confirm deployment succeeds before using it on the TV. The page requires no GitHub sign-in. GitHub CLI authentication works when network access is permitted. Source publication is performed from a temporary checkout; this local workspace does not need a running Git or Python service.
 
 ## One-time launch from the Mac
 
