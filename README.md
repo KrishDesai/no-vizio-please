@@ -111,6 +111,8 @@ The first exact-TV inspector report confirmed paired configuration reads and ide
 
 The expanded report exposes telemetry/UI flags rather than a Home assignment. A newly reviewed older-model VIZIO replacement project provides an alternative lead using USB-served CGI. See the [prepared USB compatibility probe and risk assessment](USB_PROBE_ASSESSMENT.md). It is unverified on this firmware and has not been authorized or run on the TV. The probe and launcher are isolated from the working hosted page.
 
+The owner has no USB drive. The current alternative is the [network-only read-only source audit](native-audit.html), launched with the same one-shot helper using `https://krishdesai.github.io/no-vizio-please/native-audit.html`. It reads bounded local web assets as text and reports source references, without credentials, vendor script execution, uploads or settings changes. This is an investigation tool; a USB-free permanent replacement remains unverified. See [scope and limitations](NATIVE_ROUTING_RESEARCH.md#current-constraint-and-network-only-source-audit).
+
 No supported boot launch or Home replacement has been established for this model/firmware. A webpage cannot relaunch itself after destruction; receiving DOM keys while visible does not establish system Home interception.
 
 The [Conjure client reference](https://github.com/get-air/vizio#smart-app-cast--conjure) distinguishes URL launch from installation or adding a tile. The [onn/VIZIO OS manual](https://onntvsupport.com/sites/default/files/products/docs/onn_Vizio_User_Manual.pdf) describes Home opening the built-in screen; it does not document an owner-installed replacement. This absence does not prove every vendor-assisted option impossible.

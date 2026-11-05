@@ -34,7 +34,23 @@ The corrected version-2 report succeeded on all four reads. `VIZIOHome` exposes 
 
 A separate project, [Vizio Open Home](https://github.com/jordanmateo-byte/vizio-open-home), reports autonomous Home/startup replacement on older M657-G0 firmware using USB-served CGI execution and a backed-up HTML entrypoint modification. This is a concrete VIZIO implementation to assess, but it does not validate that CGI route, file layout, or Home patch for our model. A minimal USB marker and identity-only probe have been prepared for review, with a [separate compatibility and risk assessment](USB_PROBE_ASSESSMENT.md). They have not been launched on the TV, and exploit-based testing still requires the owner's explicit approval under the original project instructions.
 
-## Prepared next step: read configuration on this TV
+## Current constraint and network-only source audit
+
+The owner has no USB drive. The USB compatibility probe remains unapproved and unrun. Hosting a CGI on GitHub or the Mac does not substitute for executing it through the TV's local USB-serving handler. The reviewed same-base-firmware [LAN research](https://github.com/vindeckyy/smartcast-backdoor) demonstrates webview/configuration access, but does not establish a native shell, writable Home files, or a working permanent launcher replacement. No USB-free permanent method is verified for this TV.
+
+The prepared alternative is **read-only investigation**, using the existing namespace 4/app 17 launch context, not a new privileged context. Launch [native-audit.html](native-audit.html) from GitHub Pages using the ordinary helper:
+
+```sh
+python3 scripts/launch-quietframe.py
+```
+
+At its URL prompt, enter `https://krishdesai.github.io/no-vizio-please/native-audit.html`. Keep the Mac and TV connected for the one-shot launch. No USB is needed. The audit page itself obtains no control/authentication token.
+
+The page reads the confirmed TV-local `/scfs/sctv/main.html` as text and at most three directly linked local JavaScript assets under `/scfs/`. It prints configuration-key references, a few routing-related presence flags, and sanitized public VIZIO script URLs for later source inspection. It does not execute those assets, load the SDK, fetch remote scripts, transmit source or reports, register keys, write settings, or connect to LOKI. A restrictive content policy permits fetches only to `http://127.0.0.1:12345`. Requests time out; oversized documents are rejected for inspection.
+
+Read access to port 12345 from our exact hosted app context is untested. A failure is recorded without enabling flags or switching to the system-modal context. A successful read only establishes access to those web assets; it does not prove they drive the native `bundles/home` UI. Coverage excludes native bundle files, external scripts and recursively imported modules. Absence of routing references in this bounded scan is not proof that no override exists.
+
+## Paired configuration inspector (completed, available to rerun)
 
 Leave the TV on **VIZIO Home**. From this project's directory on the Mac, while both devices are on the LAN:
 
@@ -65,4 +81,4 @@ Changing a startup target could leave Home blank or repeatedly restarting if the
 
 The user's original request requires a separate safety assessment and explicit approval before undocumented persistence or risky native changes. The present request authorizes this investigation; it has not been treated as approval to change unknown native settings. No approval for such a write is requested yet because there is no concrete apply/restore operation to review.
 
-The configuration inspection has not exposed a Home override. Further native/source analysis is necessary; the inspector is not a bypass. The proposed USB experiment would test one possible route to that analysis, not apply a launcher patch.
+The configuration inspection has not exposed a Home override. Further native/source analysis is necessary; neither inspector is a bypass. The network-only source audit can advance that analysis without a USB, but does not yet supply installation, boot integration or Home interception.

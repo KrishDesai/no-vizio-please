@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src http://127.0.0.1:12345; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>QuietFrame read-only source audit</title>
+<style>
+body{margin:3vh 4vw;background:#101821;color:#f7f5f0;font:20px/1.4 monospace}
+h1{font:28px sans-serif}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:75vh;overflow:auto}
+</style>
+<h1>QuietFrame — read-only source audit</h1>
+<p>Reads local assets as text. No authentication tokens, vendor script execution, settings changes, or uploads.</p>
+<pre id="report" tabindex="0">Reading local Home assets…</pre>
+<script>
+(function(){
+  'use strict';
+  var BASE='http://127.0.0.1:12345';
+  var ENTRY=BASE+'/scfs/sctv/main.html';
+  var LIMIT=2*1024*1024;
+  var MAX_SCRIPTS=3;
+  var report={audit_version:1,scope:'TV-local asset reads only; no credentials or writes',assets:[]};
+  var output=document.getElementById('report');
+  function render(){output.textContent=JSON.stringify(report,null,2);}
+  function unique(items){return items.filter(function(item,i){return items.indexOf(item)===i;});}
+  function inspect(text){
+    var keys=text.match(/(?:ApplicationFramework|SmartCastHome|AppConfigs|VIZIOApps|AppMigration):[A-Za-z0-9_:.-]{1,160}/g)||[];
+    return {config_key_references:unique(keys).slice(0,35),
+      mentions_native_home_bundle:text.indexOf('bundles/home')!==-1,
+      mentions_key_registration:text.indexOf('app/key/register')!==-1,
+      mentions_store_set:text.indexOf('app/store/set')!==-1};
+  }
+  function scriptLocations(html){
+    // Extract URLs from text without creating a DOM or executing/loading elements.
+    var pattern=/<script\b[^>]*\bsrc\s*=\s*(["'])([^"']+)\1/gi;
+    var match,local=[],remote=[];
+    while((match=pattern.exec(html))){
+      try{
+        var url=new URL(match[2].replace(/&amp;/g,'&'),ENTRY);
+        if(url.username||url.password)continue;
+        url.search='';url.hash='';
+        if(!/^\/[A-Za-z0-9_./-]{1,400}\.(?:m?js)$/i.test(url.pathname))continue;
+        if(url.origin===BASE&&url.pathname.indexOf('/scfs/')===0)local.push(url.href);
+        else if(url.protocol==='https:'&&(url.hostname==='vizio.com'||/\.(?:vizio\.com|vizio\.tv|viziocdn\.com|vzolab\.com)$/.test(url.hostname)))remote.push(url.href);
+      }catch(ignore){}
+    }
+    return {local:unique(local).slice(0,MAX_SCRIPTS),remote:unique(remote).slice(0,10)};
+  }
+  function readText(url){
+    // No URL from the page/query string or response text may select another service.
+    if(url!==ENTRY&&!/^http:\/\/127\.0\.0\.1:12345\/scfs\/[A-Za-z0-9_./-]{1,400}\.(?:m?js)$/i.test(url))return Promise.reject('URL outside asset allowlist');
+    return new Promise(function(resolve,reject){
+      var controller=typeof AbortController==='function'?new AbortController():null;
+      var done=false;
+      function finish(error,text){if(done)return;done=true;clearTimeout(timer);if(error)reject(error);else resolve(text);}
+      var timer=setTimeout(function(){finish('Timed out after 10 seconds');if(controller)controller.abort();},10000);
+      var options={method:'GET',mode:'cors',credentials:'omit',cache:'no-store',redirect:'error',referrerPolicy:'no-referrer'};
+      if(controller)options.signal=controller.signal;
+      Promise.resolve().then(function(){return fetch(url,options);}).then(function(response){
+        if(!response.ok){finish('HTTP '+response.status);return;}
+        var length=Number(response.headers.get('Content-Length'));
+        if(length>LIMIT){finish('Asset exceeds 2 MiB inspection limit');if(controller)controller.abort();return;}
+        return response.text().then(function(text){
+          if(text.length>LIMIT){finish('Asset exceeds inspection limit');return;}
+          finish(null,text);
+        });
+      }).catch(function(){finish('No readable response: browser policy or local asset service may prevent access');});
+    });
+  }
+  function auditAsset(url){
+    return readText(url).then(function(text){
+      report.assets.push({path:url.slice(BASE.length),result:'read OK',characters:text.length,findings:inspect(text)});
+      render();return text;
+    },function(error){report.assets.push({path:url.slice(BASE.length),result:error});render();return null;});
+  }
+  auditAsset(ENTRY).then(function(html){
+    if(html===null)return;
+    var refs=scriptLocations(html);
+    report.linked_public_vendor_scripts=refs.remote;
+    report.local_scripts_selected=refs.local.length;
+    report.coverage='Entry HTML and at most three directly linked local scripts; no native bundle or recursive module coverage';
+    render();
+    // Bounded sequential reads. Remote script URLs are reported, never fetched.
+    return refs.local.reduce(function(chain,url){return chain.then(function(){return auditAsset(url);});},Promise.resolve());
+  }).then(function(){report.complete=true;render();output.focus();});
+  document.addEventListener('keydown',function(event){
+    if(event.key==='ArrowDown'||event.keyCode===40){event.preventDefault();output.scrollTop+=100;}
+    if(event.key==='ArrowUp'||event.keyCode===38){event.preventDefault();output.scrollTop-=100;}
+  });
+})();
+</script>
+</html>
