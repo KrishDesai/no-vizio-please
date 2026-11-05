@@ -13,6 +13,7 @@ Target: **onn W4K43M-1030**, firmware **86.920.9.3-2**, software **86.920.9.3-2.
 | Netflix / Prime Video from hosted HTTPS | Still untested in the hosted context; earlier native mappings remain unchanged. |
 | Back/Exit from YouTube launched by hosted QuietFrame, Mac disconnected | **Owner-confirmed November 5, 2026:** returns to VIZIO Home, not QuietFrame. |
 | Normal remote power off/on while hosted QuietFrame is visible, Mac disconnected | **Owner-confirmed November 5, 2026:** opens VIZIO Home. Standby does not restore QuietFrame under the tested settings. |
+| QuietFrame/Conjure in the native apps or recent-apps list | **Owner-confirmed November 5, 2026:** neither appears. No selectable relaunch shortcut was found in the inspected UI. |
 | HDMI 1 / HDMI 2 | Configured; physical switching still needs independent confirmation. |
 | Startup into QuietFrame; Home returns to QuietFrame | **Unsolved.** User reports Home returns to VIZIO Home and reboot does not restore QuietFrame. |
 
@@ -100,9 +101,9 @@ Precise diagnosis of a generic policy/network failure requires a console/preflig
 
 ## Startup and Home: next gate after hosted controls pass
 
-Hosted YouTube and PS4 tests now pass. The owner confirmed that both Back/Exit from YouTube and normal remote standby/wake return to VIZIO Home with the Mac disconnected. Neither restores QuietFrame under the tested settings. A full restart and any visible URL/recents shortcut remain untested in the hosted context. Direct Home-button/reboot behavior in the original history remains the only supplied evidence for those paths.
+Hosted YouTube and PS4 tests now pass. The owner confirmed that both Back/Exit from YouTube and normal remote standby/wake return to VIZIO Home with the Mac disconnected. Neither restores QuietFrame under the tested settings. The owner also confirmed that neither QuietFrame nor Conjure appears in the native apps/recent-apps list. A full restart remains untested in the hosted context. Direct Home-button/reboot behavior in the original history remains the only supplied evidence for those paths.
 
-Current practical limit: page delivery and the tested controls operate independently of the Mac, but the daily launcher experience does not. No TV-only relaunch path has been verified. Further changes to the static page alone do not establish OS startup integration or Home-button behavior; those require a supported OS mechanism. A visible shortcut that reopens this exact URL would be useful even without replacing Home, but its existence must be checked rather than assumed.
+Current feasibility assessment: page delivery and the tested controls operate independently of the Mac, but the daily launcher experience does not. No TV-only relaunch path has been verified, and the inspected native apps/recents UI provides no QuietFrame/Conjure entry. The current hosted-page approach does not meet the default-interface objective. Further changes to the static page alone do not establish OS startup integration or Home-button behavior; those require an OS mechanism. No supported owner-configurable mechanism has been found in the reviewed public documentation. This is a limitation of the verified approach and available documentation, not proof that every possible firmware/vendor-assisted mechanism is impossible. Vendor-supported app registration is an avenue for inquiry, not an established solution. UI redesign is deferred because it would not resolve this blocker.
 
 No supported boot launch or Home replacement has been established for this model/firmware. A webpage cannot relaunch itself after destruction; receiving DOM keys while visible does not establish system Home interception.
 
@@ -116,7 +117,7 @@ After hosted controls pass, record these **observations**, with the Mac disconne
 | Original Back/Exit after apps and HDMI | YouTube returns to VIZIO Home (owner-confirmed); other apps/HDMI remain untested. No automatic relaunch code is included. |
 | Normal standby/wake with QuietFrame open | Returns to VIZIO Home under tested settings (owner-confirmed). QuietFrame is not restored. |
 | Normal restart using a visible TV menu, if present | Does a fresh OS session restore it? Avoid factory reset/service menus. |
-| Visible recents/favorites/bookmarks | Is QuietFrame/Conjure listed, pinnable through the normal UI, and able to reopen this exact URL? |
+| Visible apps/recents | Neither QuietFrame nor Conjure is listed (owner-confirmed). No relaunch shortcut was found in the inspected UI; arbitrary URL bookmarking is not established. |
 | Visible startup/input settings | Record offered choices before changing anything. Last HDMI input could help PS4 but does not install QuietFrame or remap Home. Restore test settings. |
 
 If normal settings provide no URL shortcut/startup choice, the next supported avenue is asking VIZIO about owner app registration, URL shortcuts, startup eligibility, and Home behavior for this firmware. [VIZIO's developer-program announcement](https://platformplus.vizio.com/news/vizio-welcomes-developers-through-first-ever-conference-and-preferred-developer-program) describes partner integration/certification; it does **not** promise acceptance of a personal launcher or Home override. No vendor messages were sent.
