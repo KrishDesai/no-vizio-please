@@ -18,8 +18,8 @@ h1{font:28px sans-serif}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-heig
   var BASE='http://127.0.0.1:12345';
   var ENTRY=BASE+'/scfs/sctv/main.html';
   var LIMIT=2*1024*1024;
-  var MAX_SCRIPTS=3;
-  var report={audit_version:1,scope:'TV-local asset reads only; no credentials or writes',assets:[]};
+  var MAX_ASSETS=4;
+  var report={audit_version:2,scope:'TV-local asset reads only; no credentials or writes',assets:[],public_vendor_assets:[]};
   var output=document.getElementById('report');
   function render(){output.textContent=JSON.stringify(report,null,2);}
   function unique(items){return items.filter(function(item,i){return items.indexOf(item)===i;});}
@@ -30,29 +30,78 @@ h1{font:28px sans-serif}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-heig
       mentions_key_registration:text.indexOf('app/key/register')!==-1,
       mentions_store_set:text.indexOf('app/store/set')!==-1};
   }
-  function scriptLocations(html){
-    // Extract URLs from text without creating a DOM or executing/loading elements.
-    var pattern=/<script\b[^>]*\bsrc\s*=\s*(["'])([^"']+)\1/gi;
-    var match,local=[],remote=[];
-    while((match=pattern.exec(html))){
+  function attribute(text,name){
+    var pattern=new RegExp('(?:^|\\s)'+name+'\\s*=\\s*(?:"([^"]*)"|\'([^\']*)\'|([^\\s"\'=<>`]+))','i');
+    var match=pattern.exec(text);
+    return match?(match[1]||match[2]||match[3]||''):'';
+  }
+  function references(text,current){
+    // Text heuristics only: do not create a DOM, follow links in a browser,
+    // import modules, or evaluate inline scripts to discover their destinations.
+    var local=[],remote=[],paths=[],types=[],resolutionBase=current;
+    var signals={looks_like_html:/<!doctype\s+html|<(?:html|body)\b/i.test(text),
+      script_tags:0,inline_script_tags:0,iframe_tags:0,meta_refresh_tags:0,has_base_tag:false,
+      has_location_code:/\blocation(?:\s*\.\s*(?:href|replace|assign))?\s*(?:=|\()/i.test(text)};
+    function add(raw,kind,follow){
       try{
-        var url=new URL(match[2].replace(/&amp;/g,'&'),ENTRY);
-        if(url.username||url.password)continue;
+        var url=new URL(raw.replace(/&amp;/g,'&').replace(/\\\//g,'/'),resolutionBase);
+        if(url.username||url.password)return;
         url.search='';url.hash='';
-        if(!/^\/[A-Za-z0-9_./-]{1,400}\.(?:m?js)$/i.test(url.pathname))continue;
-        if(url.origin===BASE&&url.pathname.indexOf('/scfs/')===0)local.push(url.href);
-        else if(url.protocol==='https:'&&(url.hostname==='vizio.com'||/\.(?:vizio\.com|vizio\.tv|viziocdn\.com|vzolab\.com)$/.test(url.hostname)))remote.push(url.href);
+        if(url.protocol!=='http:'&&url.protocol!=='https:'){types.push(kind+': non-HTTP target (withheld)');return;}
+        if(url.hostname==='localhost'&&url.port==='12345')url.hostname='127.0.0.1';
+        var staticPath=/^\/[A-Za-z0-9_./-]{1,400}\.(?:html?|m?js|json|xml)$/i.test(url.pathname);
+        if(url.origin===BASE&&url.pathname.indexOf('/scfs/')===0&&staticPath){
+          paths.push({kind:kind,path:url.pathname});
+          if(follow)local.push(url.href);
+        }else if(url.protocol==='https:'&&(url.hostname==='vizio.com'||/\.(?:vizio\.com|vizio\.tv|viziocdn\.com|vzolab\.com)$/.test(url.hostname))){
+          if(staticPath)remote.push(url.href);
+          else types.push(kind+': vendor URL without a static asset path (withheld)');
+        }else types.push(kind+': target outside asset allowlist (withheld)');
+      }catch(ignore){types.push(kind+': unrecognized URL (withheld)');}
+    }
+    var baseTag=/<base\b([^<>]*)>/i.exec(text);
+    if(baseTag){
+      signals.has_base_tag=true;
+      try{
+        var baseUrl=new URL(attribute(baseTag[1],'href'),current);
+        if(!baseUrl.username&&!baseUrl.password&&(baseUrl.protocol==='http:'||baseUrl.protocol==='https:')){
+          baseUrl.search='';baseUrl.hash='';resolutionBase=baseUrl.href;add(baseUrl.href,'base href',false);
+        }
       }catch(ignore){}
     }
-    return {local:unique(local).slice(0,MAX_SCRIPTS),remote:unique(remote).slice(0,10)};
+    var tags=/<(script|iframe|frame|meta)\b([^<>]*)>/gi,match;
+    while((match=tags.exec(text))){
+      var tag=match[1].toLowerCase(),attrs=match[2],src=attribute(attrs,'src');
+      if(tag==='script'){
+        signals.script_tags++;
+        if(src)add(src,'script src',true);else signals.inline_script_tags++;
+      }else if(tag==='iframe'||tag==='frame'){
+        signals.iframe_tags++;if(src)add(src,'frame src',true);
+      }else if(attribute(attrs,'http-equiv').toLowerCase()==='refresh'){
+        signals.meta_refresh_tags++;
+        var refresh=/\burl\s*=\s*(.*)$/i.exec(attribute(attrs,'content'));
+        if(refresh)add(refresh[1].replace(/^['"]|['"]$/g,''),'meta refresh',true);
+      }
+    }
+    var locations=/\blocation\s*(?:\.\s*(?:replace|assign)\s*\(\s*|(?:\.\s*href\s*)?=\s*)(["'])((?:\\.|[^"'\\])*)\1\s*([+;),}<\r\n]|$)/gi;
+    while((match=locations.exec(text))){
+      // A concatenated/dynamic destination is not evaluated or fetched.
+      if(match[3]==='+')types.push('location: dynamic expression (not evaluated)');
+      else add(match[2],'location literal',true);
+    }
+    // Report static vendor references in inline bootstrap strings without fetching them.
+    var urls=/(?:https?:)?\/\/[A-Za-z0-9.:[\]-]+[^\s"'<>`\\]*/gi;
+    while((match=urls.exec(text.replace(/\\\//g,'/'))))add(match[0],'URL literal',false);
+    return {local:unique(local).slice(0,3),remote:unique(remote).slice(0,10),
+      local_references:paths.slice(0,12),other_references:unique(types).slice(0,8),wrapper_signals:signals};
   }
   function readText(url){
     // No URL from the page/query string or response text may select another service.
-    if(url!==ENTRY&&!/^http:\/\/127\.0\.0\.1:12345\/scfs\/[A-Za-z0-9_./-]{1,400}\.(?:m?js)$/i.test(url))return Promise.reject('URL outside asset allowlist');
+    if(url!==ENTRY&&!/^http:\/\/127\.0\.0\.1:12345\/scfs\/[A-Za-z0-9_./-]{1,400}\.(?:html?|m?js|json|xml)$/i.test(url))return Promise.reject('URL outside asset allowlist');
     return new Promise(function(resolve,reject){
       var controller=typeof AbortController==='function'?new AbortController():null;
       var done=false;
-      function finish(error,text){if(done)return;done=true;clearTimeout(timer);if(error)reject(error);else resolve(text);}
+      function finish(error,value){if(done)return;done=true;clearTimeout(timer);if(error)reject(error);else resolve(value);}
       var timer=setTimeout(function(){finish('Timed out after 10 seconds');if(controller)controller.abort();},10000);
       var options={method:'GET',mode:'cors',credentials:'omit',cache:'no-store',redirect:'error',referrerPolicy:'no-referrer'};
       if(controller)options.signal=controller.signal;
@@ -62,27 +111,37 @@ h1{font:28px sans-serif}pre{white-space:pre-wrap;overflow-wrap:anywhere;max-heig
         if(length>LIMIT){finish('Asset exceeds 2 MiB inspection limit');if(controller)controller.abort();return;}
         return response.text().then(function(text){
           if(text.length>LIMIT){finish('Asset exceeds inspection limit');return;}
-          finish(null,text);
+          var mime=(response.headers.get('Content-Type')||'').split(';')[0].trim().toLowerCase();
+          // Do not echo arbitrary response header text.
+          if(['text/html','text/plain','application/javascript','text/javascript','application/json','application/xml','text/xml'].indexOf(mime)===-1)mime='unreported or other';
+          finish(null,{text:text,content_type:mime});
         });
       }).catch(function(){finish('No readable response: browser policy or local asset service may prevent access');});
     });
   }
   function auditAsset(url){
-    return readText(url).then(function(text){
-      report.assets.push({path:url.slice(BASE.length),result:'read OK',characters:text.length,findings:inspect(text)});
-      render();return text;
+    return readText(url).then(function(data){
+      var refs=references(data.text,url);
+      report.assets.push({path:url.slice(BASE.length),result:'read OK',characters:data.text.length,
+        content_type:data.content_type,findings:inspect(data.text),wrapper_signals:refs.wrapper_signals,
+        local_references:refs.local_references,other_references:refs.other_references});
+      report.public_vendor_assets=unique(report.public_vendor_assets.concat(refs.remote)).slice(0,15);
+      render();return refs;
     },function(error){report.assets.push({path:url.slice(BASE.length),result:error});render();return null;});
   }
-  auditAsset(ENTRY).then(function(html){
-    if(html===null)return;
-    var refs=scriptLocations(html);
-    report.linked_public_vendor_scripts=refs.remote;
-    report.local_scripts_selected=refs.local.length;
-    report.coverage='Entry HTML and at most three directly linked local scripts; no native bundle or recursive module coverage';
-    render();
-    // Bounded sequential reads. Remote script URLs are reported, never fetched.
-    return refs.local.reduce(function(chain,url){return chain.then(function(){return auditAsset(url);});},Promise.resolve());
-  }).then(function(){report.complete=true;render();output.focus();});
+  var queue=[{url:ENTRY,depth:0}],seen={};
+  report.coverage='At most four local static assets; bounded wrapper/link heuristics; no native bundle or code execution';
+  function walk(){
+    if(!queue.length||report.assets.length>=MAX_ASSETS)return Promise.resolve();
+    var next=queue.shift();
+    if(seen[next.url])return walk();
+    seen[next.url]=true;
+    return auditAsset(next.url).then(function(refs){
+      if(refs&&next.depth<2)refs.local.forEach(function(url){if(!seen[url])queue.push({url:url,depth:next.depth+1});});
+      return walk();
+    });
+  }
+  walk().then(function(){report.complete=true;render();output.focus();});
   document.addEventListener('keydown',function(event){
     if(event.key==='ArrowDown'||event.keyCode===40){event.preventDefault();output.scrollTop+=100;}
     if(event.key==='ArrowUp'||event.keyCode===38){event.preventDefault();output.scrollTop-=100;}
