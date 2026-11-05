@@ -20,6 +20,14 @@ Offline review of the [published companion SDK](https://github.com/vindeckyy/sma
 
 Do not equate a successful store write with an effective Home override. A key can exist without any native code reading it. Likewise, registering key events does not establish receipt or interception of the system Home key while another app is active.
 
+## First report from the exact TV
+
+The owner supplied the sanitized inspector report on November 5, 2026. All four external paired queries succeeded. With VIZIO Home visible, `/app/current` returned namespace **4**, app **1**, and the message identifying `app: home`, `bundle: bundles/home`. In contrast, `SmartCastHome.AppInfo` described namespace **2**, app **1**, with an empty message. These are distinct app identities. The report therefore does not establish that the `SmartCastHome` descriptor controls the active native Home; a legacy or indirect role is a hypothesis, not a confirmed explanation.
+
+`AppConfigs` contains `VIZIOHome` and `SystemUI` objects. The first inspector deliberately omitted most of their child structure. The next bounded inspection expands those two sections and selected asset-related fields, still using the same successful read requests. It also labels built-in apps by CNAME when present and excludes HomeKit matches from Home-routing candidates. HomeKit fields concern a different feature and do not establish launcher routing.
+
+No change to namespace 2/app 1, no replacement of `bundles/home`, and no store override is proposed from this report. We need to identify the actual consumer and recovery mechanism before designing any native write.
+
 ## Prepared next step: read configuration on this TV
 
 Leave the TV on **VIZIO Home**. From this project's directory on the Mac, while both devices are on the LAN:
@@ -41,7 +49,7 @@ The inspector makes exactly four allowlisted queries:
 
 The PUT method here follows the SDK's **read** implementation. There are no setting writes, launches, installs, reboots, debug flags, key registration, or exploit payloads. The helper does not execute VIZIO's SDK, whose initialization includes telemetry code. It uses the paired LAN HTTPS endpoint directly, rejects redirects, bypasses system proxies, and handles the same TV certificate limitation as the existing launch helper.
 
-Only numeric app identity, selected message structure, key names and types are printed. Raw values, URLs, device identifiers and response bodies are withheld; nothing is saved or uploaded. Configuration-query access from the external paired API is untested. An HTTP rejection is a useful result; it does not prove that the corresponding internal route is unavailable. The sanitized report is **not a recovery backup**.
+Inspector version 2 prints numeric app identity, app CNAMEs, selected message structure, and key names/types. For the selected sections it also prints recognized VIZIO/loopback source origins and static asset URLs with queries/fragments removed. URL credentials, unknown-host URLs, sensitive-field values, other scalar values, device identifiers and response bodies are withheld; nothing is saved or uploaded. External paired access to these four reads is now owner-confirmed. A future HTTP rejection would not prove that an internal route is unavailable. The sanitized report is **not a recovery backup**.
 
 ## Before considering a native write
 

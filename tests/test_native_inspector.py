@@ -108,6 +108,54 @@ class InspectorTests(unittest.TestCase):
                 inspector.main()
             build.assert_not_called()
 
+    def test_targeted_sections_include_static_assets_without_secrets(self):
+        data = {"STATUS": {"RESULT": "SUCCESS"}, "ITEM": {"VALUE": {
+            "VIZIOHome": {"Assets": {"MainURL": "https://assets.vizio.com/ui/home.js?token=" + SECRET + "#" + SECRET},
+                          "Auth": {"URL": "https://assets.vizio.com/" + SECRET + ".json"},
+                          "UnknownString": SECRET},
+            "SystemUI": {"Entry": "http://127.0.0.1:12345/scfs/ui/main.html?session=" + SECRET},
+            "OtherConfig": {"URL": "https://assets.vizio.com/not-selected.js"},
+        }}}
+        summary = inspector.summarize(data, "AppConfigs")
+        output = json.dumps(summary)
+        self.assertNotIn(SECRET, output)
+        self.assertIn("https://assets.vizio.com/ui/home.js", output)
+        self.assertIn("http://127.0.0.1:12345/scfs/ui/main.html", output)
+        self.assertNotIn("not-selected.js", output)
+        self.assertIn("VIZIOHome:UnknownString", output)
+
+    def test_asset_locations_reject_credentials_and_arbitrary_hosts_or_text(self):
+        for value in ["https://user:password@assets.vizio.com/main.js", "https://" + SECRET + ".example.com/main.js",
+                      "javascript:alert(1)", "http://[broken", SECRET]:
+            self.assertEqual(inspector.asset_location(value), {})
+        self.assertEqual(inspector.asset_location("https://assets.vizio.com/api/" + SECRET + "?token=" + SECRET),
+                         {"source_origin": "https://assets.vizio.com"})
+
+    def test_structure_is_bounded_and_withholds_arbitrary_values(self):
+        tree = {"Section" + str(i): {"Field" + str(j): SECRET for j in range(60)} for i in range(60)}
+        fields = inspector.section_structure(tree)
+        self.assertLessEqual(len(fields), 100)
+        self.assertNotIn(SECRET, json.dumps(fields))
+
+    def test_report_preserves_descriptor_mismatch_without_conflating_homekit(self):
+        current = inspector.summarize({"STATUS": {"RESULT": "SUCCESS"}, "ITEM": {"VALUE": {
+            "NAME_SPACE": 4, "APP_ID": "1", "MESSAGE": '{"app":"home","bundle":"bundles/home"}'}}}, None)
+        configured = inspector.summarize({"STATUS": {"RESULT": "SUCCESS"}, "ITEM": {"VALUE": {
+            "AppInfo": {"NAME_SPACE": 2, "APP_ID": "1"}, "AppleConfig": {"HomeKitEnabled": True}}}}, "SmartCastHome")
+        self.assertEqual(current["current_app"]["NAME_SPACE"], 4)
+        self.assertEqual(configured["home_app"]["NAME_SPACE"], 2)
+        self.assertEqual(configured["candidate_fields"], [])
+
+    def test_app_cnames_and_escaped_or_encoded_token_redaction(self):
+        summary = inspector.summarize({"STATUS": {"RESULT": "SUCCESS"}, "ITEM": {"VALUE": [
+            {"CNAME": "home", "APP_INFO": {"NAME_SPACE": 4, "APP_ID": "1"}}]}}, "VIZIOApps")
+        self.assertEqual(summary["entries"][0]["CNAME"], "home")
+        token = 'FAKE-"token/private'
+        report = {token: {"asset_url": "https://assets.vizio.com/" + inspector.urllib.parse.quote(token, safe="") + ".js"}}
+        output = json.dumps(inspector.redact_report(report, token))
+        self.assertNotIn(inspector.urllib.parse.quote(token, safe=""), output)
+        self.assertNotIn('FAKE-', output)
+
 
 if __name__ == "__main__":
     unittest.main()

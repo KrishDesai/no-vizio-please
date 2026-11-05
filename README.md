@@ -107,6 +107,8 @@ Current feasibility assessment: page delivery and the tested controls operate in
 
 The user has now requested investigation of an unofficial approach comparable to Samsung CleanFrame. See [native-routing research and the prepared read-only inspector](NATIVE_ROUTING_RESEARCH.md). This identifies a VIZIO configuration lead without claiming a working bypass or changing TV state. The existing hosted launcher is unchanged.
 
+The first exact-TV inspector report confirmed paired configuration reads and identified active Home as namespace 4/app 1 (`bundles/home`), differing from `SmartCastHome.AppInfo` at namespace 2/app 1. Inspector version 2 expands the `VIZIOHome`/`SystemUI` configuration structure through the same four reads. This mismatch is a reason to trace the actual native handler, not to try a guessed persistent override.
+
 No supported boot launch or Home replacement has been established for this model/firmware. A webpage cannot relaunch itself after destruction; receiving DOM keys while visible does not establish system Home interception.
 
 The [Conjure client reference](https://github.com/get-air/vizio#smart-app-cast--conjure) distinguishes URL launch from installation or adding a tile. The [onn/VIZIO OS manual](https://onntvsupport.com/sites/default/files/products/docs/onn_Vizio_User_Manual.pdf) describes Home opening the built-in screen; it does not document an owner-installed replacement. This absence does not prove every vendor-assisted option impossible.

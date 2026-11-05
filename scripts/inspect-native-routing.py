@@ -14,6 +14,7 @@ import re
 import ssl
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 READS = (
@@ -23,7 +24,66 @@ READS = (
     ("PUT", "/app/config/get_property", "VIZIOApps"),
 )
 SAFE_KEY = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,63}\Z")
-CANDIDATE_KEY = re.compile(r"home|boot|startup|autostart|launcher|conjure|framework", re.I)
+CANDIDATE_KEY = re.compile(r"home(?!kit)|boot|startup|autostart|launcher|conjure|framework", re.I)
+SENSITIVE_KEY = re.compile(r"auth|token|secret|password|pwd|cookie|session|credential|signature|dsk|sns|salt|user|account|device|serial|esn|dsn|ssid|email|api.?key", re.I)
+
+
+def asset_location(value):
+    """Expose only vendor/loopback origins and static asset paths, without queries."""
+    if not isinstance(value, str) or len(value) > 2048:
+        return {}
+    try:
+        url = urllib.parse.urlsplit(value)
+        host = url.hostname or ""
+        if url.scheme not in ("http", "https") or url.username or url.password:
+            return {}
+        if host not in ("127.0.0.1", "localhost", "::1", "vizio.com") and not host.endswith((".vizio.com", ".vizio.tv", ".viziocdn.com", ".vzolab.com")):
+            return {}
+        origin = url.scheme + "://" + ("[" + host + "]" if ":" in host else host)
+        if url.port:
+            origin += ":" + str(url.port)
+        result = {"source_origin": origin}
+        if re.fullmatch(r"/[A-Za-z0-9_./-]{1,400}\.(?:html?|m?js|json|xml|zip|css|wasm)", url.path, re.I):
+            result["asset_url"] = origin + url.path
+        return result
+    except ValueError:
+        return {}
+
+
+def section_structure(value, path=(), depth=0, budget=None):
+    """Expand selected configuration sections; never emit arbitrary scalar values."""
+    if budget is None:
+        budget = [100]
+    if depth > 5 or budget[0] <= 0:
+        return []
+    fields = []
+    if isinstance(value, dict):
+        children = [(key, value[key]) for key in keys(value)]
+    elif isinstance(value, list):
+        children = [("[" + str(i) + "]", node) for i, node in enumerate(value[:8])]
+    else:
+        children = []
+    for key, node in children:
+        if budget[0] <= 0:
+            break
+        parts = path + (key,)
+        field = {"field": ":".join(parts), "type": type(node).__name__}
+        if not any(SENSITIVE_KEY.search(part) for part in parts):
+            field.update(asset_location(node))
+        fields.append(field)
+        budget[0] -= 1
+        fields.extend(section_structure(node, parts, depth + 1, budget))
+    return fields
+
+
+def redact_report(value, token):
+    if isinstance(value, str):
+        return value.replace(token, "[redacted]").replace(urllib.parse.quote(token, safe=""), "[redacted]")
+    if isinstance(value, list):
+        return [redact_report(item, token) for item in value]
+    if isinstance(value, dict):
+        return {redact_report(key, token): redact_report(item, token) for key, item in value.items()}
+    return value
 
 
 def keys(value):
@@ -102,12 +162,26 @@ def summarize(data, root):
         result["root_fields"] = keys(value)
         result["home_app"] = app_summary(value.get("AppInfo")) if isinstance(value, dict) else None
         result["candidate_fields"] = candidate_fields(value)
+        if isinstance(value, dict):
+            result["selected_structure"] = section_structure({key: value[key] for key in
+                ("Override", "LocalAssetsUri", "UrlEndpoint", "ServiceMessageRouterUrl") if key in value})
     elif root == "AppConfigs":
         result["root_fields"] = keys(value)
         result["candidate_fields"] = candidate_fields(value)
+        if isinstance(value, dict):
+            result["selected_structure"] = {key: section_structure(value[key], (key,))
+                for key in ("VIZIOHome", "SystemUI") if key in value}
     elif root == "VIZIOApps":
-        result["entries"] = [summary for entry in value[:100]
-                             if isinstance(entry, dict) and (summary := app_summary(entry.get("APP_INFO")))] if isinstance(value, list) else []
+        result["entries"] = []
+        for entry in value[:100] if isinstance(value, list) else []:
+            if not isinstance(entry, dict):
+                continue
+            summary = app_summary(entry.get("APP_INFO"))
+            if summary is not None:
+                cname = entry.get("CNAME")
+                if isinstance(cname, str) and SAFE_KEY.fullmatch(cname):
+                    summary["CNAME"] = cname
+                result["entries"].append(summary)
     return result
 
 
@@ -159,12 +233,12 @@ def main():
         urllib.request.HTTPSHandler(context=ssl._create_unverified_context()),
         NoRedirect(),
     )
-    report = {"scope": "paired LAN API reads only; no settings changed", "reads": []}
+    report = {"inspector_version": 2, "scope": "paired LAN API reads only; no settings changed", "reads": []}
     for method, path, root in READS:
         result = read_config(opener, origin, token, method, path, root)
         report["reads"].append({"path": path, "root": root, **result})
     # Defense against a response reflecting the external token even as a key.
-    output = json.dumps(report, indent=2).replace(token, "[redacted]")
+    output = json.dumps(redact_report(report, token), indent=2)
     print(output)
 
 
