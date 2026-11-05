@@ -12,6 +12,7 @@ Target: **onn W4K43M-1030**, firmware **86.920.9.3-2**, software **86.920.9.3-2.
 | Hosted HTTPS: YouTube launch and PS4/HDMI 3 switch with Mac disconnected | **Owner-confirmed November 5, 2026**, from `https://krishdesai.github.io/no-vizio-please/`. Successful actions exercise token acquisition, app-launch PUT, and input read/modify paths. Individual HTTP responses, browser user agent, and power-probe status were not separately supplied. |
 | Netflix / Prime Video from hosted HTTPS | Still untested in the hosted context; earlier native mappings remain unchanged. |
 | Back/Exit from YouTube launched by hosted QuietFrame, Mac disconnected | **Owner-confirmed November 5, 2026:** returns to VIZIO Home, not QuietFrame. |
+| Normal remote power off/on while hosted QuietFrame is visible, Mac disconnected | **Owner-confirmed November 5, 2026:** opens VIZIO Home. Standby does not restore QuietFrame under the tested settings. |
 | HDMI 1 / HDMI 2 | Configured; physical switching still needs independent confirmation. |
 | Startup into QuietFrame; Home returns to QuietFrame | **Unsolved.** User reports Home returns to VIZIO Home and reboot does not restore QuietFrame. |
 
@@ -99,7 +100,9 @@ Precise diagnosis of a generic policy/network failure requires a console/preflig
 
 ## Startup and Home: next gate after hosted controls pass
 
-Hosted YouTube and PS4 tests now pass, so this investigation is active. The owner also confirmed that Back/Exit from YouTube returns to VIZIO Home with the Mac disconnected; it does not restore QuietFrame. Standby resume, normal restart behavior, and any visible URL/recents shortcut remain untested in the hosted context. Direct Home-button/reboot behavior in the original history remains the only supplied evidence for those paths.
+Hosted YouTube and PS4 tests now pass. The owner confirmed that both Back/Exit from YouTube and normal remote standby/wake return to VIZIO Home with the Mac disconnected. Neither restores QuietFrame under the tested settings. A full restart and any visible URL/recents shortcut remain untested in the hosted context. Direct Home-button/reboot behavior in the original history remains the only supplied evidence for those paths.
+
+Current practical limit: page delivery and the tested controls operate independently of the Mac, but the daily launcher experience does not. No TV-only relaunch path has been verified. Further changes to the static page alone do not establish OS startup integration or Home-button behavior; those require a supported OS mechanism. A visible shortcut that reopens this exact URL would be useful even without replacing Home, but its existence must be checked rather than assumed.
 
 No supported boot launch or Home replacement has been established for this model/firmware. A webpage cannot relaunch itself after destruction; receiving DOM keys while visible does not establish system Home interception.
 
@@ -111,7 +114,7 @@ After hosted controls pass, record these **observations**, with the Mac disconne
 | --- | --- |
 | Home while QuietFrame is open | Does it still open VIZIO Home? Do not attempt remapping. |
 | Original Back/Exit after apps and HDMI | YouTube returns to VIZIO Home (owner-confirmed); other apps/HDMI remain untested. No automatic relaunch code is included. |
-| Normal standby/wake with QuietFrame open | Does the OS resume it? Resume alone is not boot persistence. |
+| Normal standby/wake with QuietFrame open | Returns to VIZIO Home under tested settings (owner-confirmed). QuietFrame is not restored. |
 | Normal restart using a visible TV menu, if present | Does a fresh OS session restore it? Avoid factory reset/service menus. |
 | Visible recents/favorites/bookmarks | Is QuietFrame/Conjure listed, pinnable through the normal UI, and able to reopen this exact URL? |
 | Visible startup/input settings | Record offered choices before changing anything. Last HDMI input could help PS4 but does not install QuietFrame or remap Home. Restore test settings. |
