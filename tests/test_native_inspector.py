@@ -1,0 +1,113 @@
+"""The native-routing inspector must issue configuration reads only."""
+
+import contextlib
+import importlib.util
+import io
+import json
+from pathlib import Path
+import unittest
+from unittest import mock
+import urllib.error
+import urllib.request
+
+SPEC = importlib.util.spec_from_file_location(
+    "inspector", Path(__file__).resolve().parents[1] / "scripts" / "inspect-native-routing.py"
+)
+inspector = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(inspector)
+SECRET = "FAKE-private-pairing-token"
+
+
+def response(value):
+    return io.BytesIO(json.dumps({"STATUS": {"RESULT": "SUCCESS"}, "ITEM": {"VALUE": value}}).encode())
+
+
+class InspectorTests(unittest.TestCase):
+    def test_all_requests_are_bounded_reads(self):
+        opener = mock.Mock()
+        for method, path, root in inspector.READS:
+            opener.open.return_value = response({})
+            inspector.read_config(opener, "https://192.168.1.50:7345", SECRET, method, path, root)
+            request = opener.open.call_args.args[0]
+            self.assertEqual(request.get_header("Auth"), SECRET)
+            if method == "GET":
+                self.assertEqual(path, "/app/current")
+                self.assertIsNone(request.data)
+            else:
+                self.assertEqual(path, "/app/config/get_property")
+                self.assertEqual(json.loads(request.data), {"VALUE": root})
+        self.assertEqual(opener.open.call_count, 4)
+
+    def test_writes_and_arbitrary_queries_are_rejected_before_network(self):
+        opener = mock.Mock()
+        for method, path, root in [
+            ("PUT", "/app/store/set", "SmartCastHome"),
+            ("PUT", "/app/launch", None),
+            ("PUT", "/app/config/get_property", "Account"),
+            ("GET", "/system/reboot", None),
+        ]:
+            with self.assertRaises(ValueError):
+                inspector.read_config(opener, "https://192.168.1.50:7345", SECRET, method, path, root)
+        opener.open.assert_not_called()
+
+    def test_summaries_withhold_raw_values_credentials_and_identifiers(self):
+        data = {"STATUS": {"RESULT": "SUCCESS"}, "ITEM": {"VALUE": {
+            "Dsk": SECRET, "Sns": SECRET, "SERIAL_NUMBER": SECRET,
+            "AppInfo": {"NAME_SPACE": 4, "APP_ID": "1", "MESSAGE": json.dumps({
+                "app": "home", "bundle": "bundles/home", "AUTH": SECRET, "token": SECRET
+            })},
+            "Home": {"URL": "https://example.invalid/?token=" + SECRET},
+        }}}
+        summary = inspector.summarize(data, "SmartCastHome")
+        output = json.dumps(summary)
+        self.assertNotIn(SECRET, output)
+        self.assertNotIn("example.invalid", output)
+        self.assertEqual(summary["home_app"]["bundle"], "bundles/home")
+        self.assertEqual(summary["home_app"]["NAME_SPACE"], 4)
+
+    def test_url_messages_are_not_printed(self):
+        summary = inspector.app_summary({"NAME_SPACE": 4, "APP_ID": "17", "MESSAGE": "https://example.invalid/" + SECRET})
+        self.assertEqual(summary["message_kind"], "URL (value withheld)")
+        self.assertNotIn(SECRET, json.dumps(summary))
+
+    def test_errors_never_echo_response_or_exception_details(self):
+        opener = mock.Mock()
+        opener.open.side_effect = urllib.error.URLError(SECRET)
+        summary = inspector.read_config(opener, "https://192.168.1.50:7345", SECRET, *inspector.READS[0])
+        self.assertNotIn(SECRET, json.dumps(summary))
+        data = {"STATUS": {"RESULT": SECRET, "DETAIL": SECRET}}
+        self.assertNotIn(SECRET, json.dumps(inspector.summarize(data, None)))
+
+    def test_main_uses_no_proxy_or_redirect_and_redacts_reflected_token_keys(self):
+        opener = mock.Mock()
+        opener.open.side_effect = [response({}), response({SECRET: "ignored"}), response({}), response([])]
+        output = io.StringIO()
+        with mock.patch.dict(inspector.os.environ, {"TV_IP": "192.168.1.50", "VIZIO_TOKEN": SECRET}, clear=True), \
+             mock.patch.object(inspector.urllib.request, "build_opener", return_value=opener) as build, \
+             contextlib.redirect_stdout(output):
+            inspector.main()
+        self.assertNotIn(SECRET, output.getvalue())
+        self.assertEqual(len(json.loads(output.getvalue())["reads"]), 4)
+        handlers = build.call_args.args
+        self.assertTrue(any(isinstance(h, urllib.request.ProxyHandler) and h.proxies == {} for h in handlers))
+        redirect = next(h for h in handlers if isinstance(h, urllib.request.HTTPRedirectHandler))
+        self.assertIsNone(redirect.redirect_request(None, None, 302, "", {}, "https://elsewhere.invalid/"))
+
+    def test_noninteractive_token_prompt_is_rejected(self):
+        with mock.patch.dict(inspector.os.environ, {"TV_IP": "192.168.1.50"}, clear=True), \
+             mock.patch.object(inspector.sys.stdin, "isatty", return_value=False), \
+             mock.patch.object(inspector.getpass, "getpass") as prompt:
+            with self.assertRaisesRegex(SystemExit, "interactive Terminal"):
+                inspector.main()
+            prompt.assert_not_called()
+
+    def test_public_ip_is_rejected_before_network(self):
+        with mock.patch.dict(inspector.os.environ, {"TV_IP": "8.8.8.8", "VIZIO_TOKEN": SECRET}, clear=True), \
+             mock.patch.object(inspector.urllib.request, "build_opener") as build:
+            with self.assertRaisesRegex(SystemExit, "private LAN"):
+                inspector.main()
+            build.assert_not_called()
+
+
+if __name__ == "__main__":
+    unittest.main()
