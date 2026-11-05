@@ -85,7 +85,7 @@ class InspectorTests(unittest.TestCase):
         with mock.patch.dict(inspector.os.environ, {"TV_IP": "192.168.1.50", "VIZIO_TOKEN": SECRET}, clear=True), \
              mock.patch.object(inspector.urllib.request, "build_opener", return_value=opener) as build, \
              contextlib.redirect_stdout(output):
-            inspector.main()
+            inspector.main([])
         self.assertNotIn(SECRET, output.getvalue())
         self.assertEqual(len(json.loads(output.getvalue())["reads"]), 4)
         handlers = build.call_args.args
@@ -98,14 +98,14 @@ class InspectorTests(unittest.TestCase):
              mock.patch.object(inspector.sys.stdin, "isatty", return_value=False), \
              mock.patch.object(inspector.getpass, "getpass") as prompt:
             with self.assertRaisesRegex(SystemExit, "interactive Terminal"):
-                inspector.main()
+                inspector.main([])
             prompt.assert_not_called()
 
     def test_public_ip_is_rejected_before_network(self):
         with mock.patch.dict(inspector.os.environ, {"TV_IP": "8.8.8.8", "VIZIO_TOKEN": SECRET}, clear=True), \
              mock.patch.object(inspector.urllib.request, "build_opener") as build:
             with self.assertRaisesRegex(SystemExit, "private LAN"):
-                inspector.main()
+                inspector.main([])
             build.assert_not_called()
 
     def test_targeted_sections_include_static_assets_without_secrets(self):
@@ -155,6 +155,49 @@ class InspectorTests(unittest.TestCase):
         output = json.dumps(inspector.redact_report(report, token))
         self.assertNotIn(inspector.urllib.parse.quote(token, safe=""), output)
         self.assertNotIn('FAKE-', output)
+
+    def test_framework_mode_queries_only_the_three_reviewed_reads(self):
+        opener = mock.Mock()
+        opener.open.side_effect = [response({}), response({}), response({"ChromiumSettings": {"DebugEnabled": False}})]
+        output = io.StringIO()
+        with mock.patch.dict(inspector.os.environ, {"TV_IP": "192.168.1.50", "VIZIO_TOKEN": SECRET}, clear=True), \
+             mock.patch.object(inspector.urllib.request, "build_opener", return_value=opener), \
+             contextlib.redirect_stdout(output):
+            inspector.main(["--framework"])
+        report = json.loads(output.getvalue())
+        self.assertEqual(report["inspector_version"], 3)
+        self.assertEqual(report["inspection_mode"], "framework")
+        self.assertEqual([r["root"] for r in report["reads"]], [None, "SmartCastHome", "ApplicationFramework"])
+        self.assertEqual(opener.open.call_count, 3)
+        self.assertEqual([json.loads(call.args[0].data)["VALUE"] for call in opener.open.call_args_list[1:]],
+                         ["SmartCastHome", "ApplicationFramework"])
+
+    def test_framework_structure_retains_only_safe_app_identity_and_bundle_paths(self):
+        data = {"STATUS": {"RESULT": "SUCCESS"}, "ITEM": {"VALUE": {
+            "Applications": {"Home": {"NAME_SPACE": 4, "APP_ID": "1", "MESSAGE": '{"bundle":"bundles/home","token":"PRIVATE"}'},
+                             "Other": {"Bundle": "bundles/other"}},
+            "Auth": {"App": {"NAME_SPACE": 4, "APP_ID": "123", "MESSAGE": SECRET}},
+            "OtherValue": SECRET,
+        }}}
+        summary = inspector.summarize(data, "ApplicationFramework")
+        output = json.dumps(summary)
+        self.assertIn('bundles/home', output)
+        self.assertIn('bundles/other', output)
+        self.assertNotIn(SECRET, output)
+        self.assertNotIn('PRIVATE', output)
+        self.assertNotIn('"123"', output)
+        self.assertLessEqual(len(summary["selected_structure"]), 200)
+
+    def test_asset_base_is_exposed_only_for_the_reviewed_vendor_field_without_query_or_credentials(self):
+        data = {"STATUS": {"RESULT": "SUCCESS"}, "ITEM": {"VALUE": {
+            "LocalAssetsUri": "https://scfs2.vizio.com/release/build123/?token=" + SECRET + "#" + SECRET,
+            "ServiceMessageRouterUrl": "https://message-router.vizio.com/" + SECRET,
+        }}}
+        summary = inspector.summarize(data, "SmartCastHome")
+        bases = [field["source_base"] for field in summary["selected_structure"] if "source_base" in field]
+        self.assertEqual(bases, ["https://scfs2.vizio.com/release/build123/"])
+        self.assertNotIn(SECRET, json.dumps(summary))
+        self.assertEqual(inspector.asset_location("https://user:password@scfs2.vizio.com/private/", allow_base=True), {})
 
 
 if __name__ == "__main__":

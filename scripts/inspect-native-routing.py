@@ -6,6 +6,7 @@ or device identifiers are saved. PUT on get_property is a read, as implemented
 in the published companion SDK. No bundled SDK or third-party code is executed.
 """
 
+import argparse
 import getpass
 import ipaddress
 import json
@@ -23,12 +24,17 @@ READS = (
     ("PUT", "/app/config/get_property", "AppConfigs"),
     ("PUT", "/app/config/get_property", "VIZIOApps"),
 )
+FRAMEWORK_READS = (
+    READS[0],
+    READS[1],
+    ("PUT", "/app/config/get_property", "ApplicationFramework"),
+)
 SAFE_KEY = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,63}\Z")
 CANDIDATE_KEY = re.compile(r"home(?!kit)|boot|startup|autostart|launcher|conjure|framework", re.I)
 SENSITIVE_KEY = re.compile(r"auth|token|secret|password|pwd|cookie|session|credential|signature|dsk|sns|salt|user|account|device|serial|esn|dsn|ssid|email|api.?key", re.I)
 
 
-def asset_location(value):
+def asset_location(value, *, allow_base=False):
     """Expose only vendor/loopback origins and static asset paths, without queries."""
     if not isinstance(value, str) or len(value) > 2048:
         return {}
@@ -45,6 +51,8 @@ def asset_location(value):
         result = {"source_origin": origin}
         if re.fullmatch(r"/[A-Za-z0-9_./-]{1,400}\.(?:html?|m?js|json|xml|zip|css|wasm)", url.path, re.I):
             result["asset_url"] = origin + url.path
+        if allow_base and host == "scfs2.vizio.com" and re.fullmatch(r"/[A-Za-z0-9_./-]{0,400}", url.path):
+            result["source_base"] = origin + url.path
         return result
     except ValueError:
         return {}
@@ -69,7 +77,12 @@ def section_structure(value, path=(), depth=0, budget=None):
         parts = path + (key,)
         field = {"field": ":".join(parts), "type": type(node).__name__}
         if not any(SENSITIVE_KEY.search(part) for part in parts):
-            field.update(asset_location(node))
+            field.update(asset_location(node, allow_base=key == "LocalAssetsUri"))
+            identity = app_summary(node)
+            if identity:
+                field["app_identity"] = identity
+            if isinstance(node, str) and re.fullmatch(r"bundles/[a-z0-9/_-]{1,120}", node):
+                field["bundle_path"] = node
         fields.append(field)
         budget[0] -= 1
         fields.extend(section_structure(node, parts, depth + 1, budget))
@@ -171,6 +184,12 @@ def summarize(data, root):
         if isinstance(value, dict):
             result["selected_structure"] = {key: section_structure(value[key], (key,))
                 for key in ("VIZIOHome", "SystemUI") if key in value}
+    elif root == "ApplicationFramework":
+        result["value_type"] = type(value).__name__
+        result["root_fields"] = keys(value)
+        result["candidate_fields"] = candidate_fields(value)
+        result["selected_structure"] = section_structure(value, (root,), budget=[200])
+        result["structure_limits"] = {"fields": 200, "depth": 5, "items_per_array": 8}
     elif root == "VIZIOApps":
         result["entries"] = []
         for entry in value[:100] if isinstance(value, list) else []:
@@ -191,7 +210,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 
 
 def read_config(opener, origin, token, method, path, root):
-    if (method, path, root) not in READS:
+    if (method, path, root) not in READS + FRAMEWORK_READS:
         raise ValueError("Request is outside the fixed read-only allowlist")
     headers = {"AUTH": token}
     body = None
@@ -211,7 +230,10 @@ def read_config(opener, origin, token, method, path, root):
         return {"result": "no readable JSON response; details withheld"}
 
 
-def main():
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Read-only native-routing configuration inspection; no TV changes.")
+    parser.add_argument("--framework", action="store_true", help="Read current app, SmartCastHome source location and ApplicationFramework structure.")
+    args = parser.parse_args(argv)
     host = os.environ.get("TV_IP") or input("TV's LAN IP address: ").strip()
     try:
         address = ipaddress.ip_address(host)
@@ -233,8 +255,9 @@ def main():
         urllib.request.HTTPSHandler(context=ssl._create_unverified_context()),
         NoRedirect(),
     )
-    report = {"inspector_version": 2, "scope": "paired LAN API reads only; no settings changed", "reads": []}
-    for method, path, root in READS:
+    report = {"inspector_version": 3, "inspection_mode": "framework" if args.framework else "standard",
+              "scope": "paired LAN API reads only; no settings changed", "reads": []}
+    for method, path, root in FRAMEWORK_READS if args.framework else READS:
         result = read_config(opener, origin, token, method, path, root)
         report["reads"].append({"path": path, "root": root, **result})
     # Defense against a response reflecting the external token even as a key.

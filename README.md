@@ -115,6 +115,8 @@ The owner has no USB drive. The current alternative is the [network-only read-on
 
 The owner confirmed the first source audit could read `/scfs/sctv/main.html` (1,092 characters). It found no recognized direct script links. Audit version 2 adds wrapper/redirect/inline-script structure inspection with a four-asset read limit. Relaunch using `https://krishdesai.github.io/no-vizio-please/native-audit.html?audit=2` and check `audit_version: 2`; no native write or code-execution test is involved.
 
+Audit version 2 subsequently read `js/chunk-vendors.js` (150,218 characters) and `app.js` (173,228 characters). The latter contains app-order/feature-card/activity-policy references, without a literal native Home hook in the scan. Inspector version 3 adds `python3 scripts/inspect-native-routing.py --framework` to read the previously unqueried `ApplicationFramework` configuration structure and retain the sanitized `LocalAssetsUri` CDN directory. This focused mode makes three reads and no writes; see [details and limits](NATIVE_ROUTING_RESEARCH.md#focused-framework-and-source-location-read).
+
 No supported boot launch or Home replacement has been established for this model/firmware. A webpage cannot relaunch itself after destruction; receiving DOM keys while visible does not establish system Home interception.
 
 The [Conjure client reference](https://github.com/get-air/vizio#smart-app-cast--conjure) distinguishes URL launch from installation or adding a tile. The [onn/VIZIO OS manual](https://onntvsupport.com/sites/default/files/products/docs/onn_Vizio_User_Manual.pdf) describes Home opening the built-in screen; it does not document an owner-installed replacement. This absence does not prove every vendor-assisted option impossible.

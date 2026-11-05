@@ -50,6 +50,22 @@ Audit version 2 reads the confirmed TV-local `/scfs/sctv/main.html` as text and 
 
 The owner supplied both a TV photo and the complete version-1 JSON report: `/scfs/sctv/main.html` read successfully with 1,092 characters. No recognized direct script URLs or routing-key references were found; the first audit therefore fetched no scripts. This confirms port-12345 asset reads from our hosted app context. It does not establish the file's contents or role: a wrapper/redirect/inline bootstrap is a hypothesis. Version 2 adds the missing structure inspection. A future failure is recorded without enabling flags or switching to the system-modal context. Coverage still excludes native bundle files, external assets, evaluated dynamic destinations and a full module graph. Absence of routing references in the bounded scan is not proof that no override exists.
 
+The owner then supplied audit version 2: the entry contains three script tags (one inline), no frame/meta-refresh/base-tag/location signal, and links to `/scfs/sctv/js/chunk-vendors.js` (150,218 characters) and `/scfs/sctv/app.js` (173,228 characters). Both scripts were readable. `app.js` references feature cards, app sorting, d-pad and activity-policy state; the scan found no literal `bundles/home`, `app/key/register` or `app/store/set`. These are source-reference findings, not a full call-graph analysis: wrapper SDK calls and constructed strings could avoid those literal matches. No vendor source was executed or transferred.
+
+## Focused framework and source-location read
+
+The active native Home remains namespace 4/app 1 with `bundles/home`; the readable web assets belong to the `sctv` entry. Their exact relationship to native Home is not established. Rather than expanding keyword scans of the same web assets, inspector version 3 adds a focused mode:
+
+```sh
+python3 scripts/inspect-native-routing.py --framework
+```
+
+Run with VIZIO Home visible and Mac/TV connected. This mode issues exactly three paired read requests: `/app/current`, configuration root `SmartCastHome`, and configuration root `ApplicationFramework`. The published SDK already reads an `ApplicationFramework` property for Chromium settings; whether this root exposes routing on this TV is unknown. The inspector reports bounded structure, numeric app descriptors, literal `bundles/...` paths, and sanitized asset locations without other scalar values. No native setting, debug flag, registry entry or store value is changed.
+
+For the explicitly known `LocalAssetsUri` field, the report now includes the directory path on `scfs2.vizio.com`, with credentials rejected and query/fragment omitted. Earlier reports printed only that origin, so a public source URL could not be derived. Two ordinary public path guesses were inaccessible to the browsing tool and supplied no source evidence. The configured path may enable offline retrieval of the exact vendor JavaScript without uploading TV source or credentials. It is not a guarantee that the CDN will serve it.
+
+The structure limits are explicit: 200 fields, depth five, first eight entries per array. A null/failed root read or a structure containing only browser options would leave the native-routing question unanswered; it would not justify inventing or writing a Home key. The next meaningful step requires an actual consumer or source location, not more successful writes to arbitrary configuration names.
+
 ## Paired configuration inspector (completed, available to rerun)
 
 Leave the TV on **VIZIO Home**. From this project's directory on the Mac, while both devices are on the LAN:
@@ -60,7 +76,7 @@ python3 scripts/inspect-native-routing.py
 
 Python 3.8+ is required. Enter the numeric TV IP and external pairing token at the hidden local prompt, or use already exported `TV_IP` / `VIZIO_TOKEN`. Do not paste the token into chat or source files.
 
-The inspector makes exactly four allowlisted queries:
+The default inspector mode makes four allowlisted queries; `--framework` selects the three reads described above instead:
 
 | Method and route | Purpose |
 | --- | --- |
