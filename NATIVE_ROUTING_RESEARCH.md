@@ -28,6 +28,12 @@ The owner supplied the sanitized inspector report on November 5, 2026. All four 
 
 No change to namespace 2/app 1, no replacement of `bundles/home`, and no store override is proposed from this report. We need to identify the actual consumer and recovery mechanism before designing any native write.
 
+## Expanded report and alternative implementation evidence
+
+The corrected version-2 report succeeded on all four reads. `VIZIOHome` exposes Sentry settings; the reported `SystemUI` structure exposes Sentry, notification, logging/debug and UI feature fields, without a visible Home-app assignment. `VIZIOApps` identifies namespace 2/app 1 as `sctv`; its configured endpoint is `/scfs/sctv/main.html`, whereas current Home still identifies `bundles/home` at namespace 4/app 1. These observations do not establish a writable native routing field. No further version of the configuration inspector is needed for the same sections at this point.
+
+A separate project, [Vizio Open Home](https://github.com/jordanmateo-byte/vizio-open-home), reports autonomous Home/startup replacement on older M657-G0 firmware using USB-served CGI execution and a backed-up HTML entrypoint modification. This is a concrete VIZIO implementation to assess, but it does not validate that CGI route, file layout, or Home patch for our model. A minimal USB marker and identity-only probe have been prepared for review, with a [separate compatibility and risk assessment](USB_PROBE_ASSESSMENT.md). They have not been launched on the TV, and exploit-based testing still requires the owner's explicit approval under the original project instructions.
+
 ## Prepared next step: read configuration on this TV
 
 Leave the TV on **VIZIO Home**. From this project's directory on the Mac, while both devices are on the LAN:
@@ -59,4 +65,4 @@ Changing a startup target could leave Home blank or repeatedly restarting if the
 
 The user's original request requires a separate safety assessment and explicit approval before undocumented persistence or risky native changes. The present request authorizes this investigation; it has not been treated as approval to change unknown native settings. No approval for such a write is requested yet because there is no concrete apply/restore operation to review.
 
-The next result should determine whether we can trace a real VIZIO Home-routing consumer. If the available descriptor is only informational or cloud-managed, further source/native analysis will be necessary; the inspector is not itself a bypass or a promise that one exists.
+The configuration inspection has not exposed a Home override. Further native/source analysis is necessary; the inspector is not a bypass. The proposed USB experiment would test one possible route to that analysis, not apply a launcher patch.
