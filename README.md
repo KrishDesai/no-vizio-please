@@ -1,6 +1,6 @@
 # QuietFrame v8.1 — hosted TV control test
 
-Target: **onn W4K43M-1030**, firmware **86.920.9.3-2**, software **86.920.9.3-2.12**. This is a static, self-contained `index.html`. Its control requests target only the TV's `http://127.0.0.1:7346`; no running Mac controller is involved. **Operation from hosted HTTPS is still unverified on this TV.** Internet access to the static host is required when loading the page. This is not an offline installation or a default launcher replacement.
+Target: **onn W4K43M-1030**, firmware **86.920.9.3-2**, software **86.920.9.3-2.12**. This is a static, self-contained `index.html`. Its control requests target only the TV's `http://127.0.0.1:7346`; no running Mac controller is involved. **The owner confirmed YouTube launching and PS4/HDMI 3 switching from hosted HTTPS with the Mac disconnected on November 5, 2026.** Internet access to the static host is required when loading the page. This is not an offline installation or a default launcher replacement.
 
 ## Evidence and scope
 
@@ -9,7 +9,8 @@ Target: **onn W4K43M-1030**, firmware **86.920.9.3-2**, software **86.920.9.3-2.
 | Remote navigation; YouTube 5/1, Netflix 3/1, Prime Video 3/3; PS4 `hdmi3` via fresh numeric HASHVAL | User reports successful physical-TV tests in earlier versions. |
 | TV-side YouTube and PS4 control from a locally HTTP-served page | User reports v7 passed on this exact TV. |
 | v8 control code matches available v7 | Compared with `~/Downloads/quietframe-vizio-v7-probe/quietframe-vizio.html`; original differences were presentation/status text only. |
-| Hosted HTTPS access to power/token/input/launch endpoints | **Not tested on the TV.** Power-read success alone does not verify the other routes. |
+| Hosted HTTPS: YouTube launch and PS4/HDMI 3 switch with Mac disconnected | **Owner-confirmed November 5, 2026**, from `https://krishdesai.github.io/no-vizio-please/`. Successful actions exercise token acquisition, app-launch PUT, and input read/modify paths. Individual HTTP responses, browser user agent, and power-probe status were not separately supplied. |
+| Netflix / Prime Video from hosted HTTPS | Still untested in the hosted context; earlier native mappings remain unchanged. |
 | HDMI 1 / HDMI 2 | Configured; physical switching still needs independent confirmation. |
 | Startup into QuietFrame; Home returns to QuietFrame | **Unsolved.** User reports Home returns to VIZIO Home and reboot does not restore QuietFrame. |
 
@@ -66,8 +67,8 @@ A blank result is untested:
 | --- | --- | --- | --- | --- |
 | Hosted page/build + navigation | Initial launch uses Mac | | | |
 | Power probe from hosted HTTPS | | | | |
-| YouTube | | | | |
-| PS4 / HDMI 3, from another input | | | | |
+| YouTube | Yes, owner-confirmed | Not separately recorded | Native app works | Pass, November 5, 2026 |
+| PS4 / HDMI 3, from another input | Yes, owner-confirmed after requesting this procedure | Not separately recorded | Owner confirmed input test works | Pass, November 5, 2026 |
 | Netflix | | | | |
 | Prime Video | | | | |
 | HDMI 1, from another input | | | | |
@@ -97,6 +98,8 @@ Precise diagnosis of a generic policy/network failure requires a console/preflig
 
 ## Startup and Home: next gate after hosted controls pass
 
+Hosted YouTube and PS4 tests now pass, so this investigation is active. Exiting apps with Back/Exit, standby resume, normal restart behavior, and any visible URL/recents shortcut remain untested in the hosted context. Home/reboot behavior in the original history remains the only supplied evidence for those paths.
+
 No supported boot launch or Home replacement has been established for this model/firmware. A webpage cannot relaunch itself after destruction; receiving DOM keys while visible does not establish system Home interception.
 
 The [Conjure client reference](https://github.com/get-air/vizio#smart-app-cast--conjure) distinguishes URL launch from installation or adding a tile. The [onn/VIZIO OS manual](https://onntvsupport.com/sites/default/files/products/docs/onn_Vizio_User_Manual.pdf) describes Home opening the built-in screen; it does not document an owner-installed replacement. This absence does not prove every vendor-assisted option impossible.
@@ -113,6 +116,8 @@ After hosted controls pass, record these **observations**, with the Mac disconne
 | Visible startup/input settings | Record offered choices before changing anything. Last HDMI input could help PS4 but does not install QuietFrame or remap Home. Restore test settings. |
 
 If normal settings provide no URL shortcut/startup choice, the next supported avenue is asking VIZIO about owner app registration, URL shortcuts, startup eligibility, and Home behavior for this firmware. [VIZIO's developer-program announcement](https://platformplus.vizio.com/news/vizio-welcomes-developers-through-first-ever-conference-and-preferred-developer-program) describes partner integration/certification; it does **not** promise acceptance of a personal launcher or Home override. No vendor messages were sent.
+
+Research checked November 5, 2026: [VIZIO's current Home FAQ](https://www.vizio.com/en/home-screen) describes adding apps from its catalog and arranging them, without documenting arbitrary URL tiles or remapping Home. The [official content-partner page](https://www.vizio.com/en/content-partners) offers app submission and partner onboarding. Its developer-specification link, [docs.developer.vizio.com](https://docs.developer.vizio.com/), redirects to sign-in; those specifications were not accessible in this session. Public materials therefore do not establish an owner-installation, autostart, or Home-override API for this firmware. This is a documentation/access limit, not proof of impossibility. No app-submission or support forms were sent.
 
 The [sibling-model research](https://github.com/vindeckyy/smartcast-backdoor) describes internal access and undocumented persistence. This does not establish a supported installation method or safe Home replacement here. No config-store writes, service activation, exploit chain, firmware changes, or always-on watcher are included. Without a supported relaunch path, hosted QuietFrame remains manually launched.
 
